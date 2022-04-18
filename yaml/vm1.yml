@@ -1,0 +1,65 @@
+apiVersion: kubevirt.io/v1
+kind: VirtualMachine
+metadata:
+  labels:
+    kubevirt.io/domain: production-1
+    kubevirt.io/os: linux
+    production: ready
+  name: production-1
+  namespace: default
+spec:
+  running: true
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        kubevirt.io/domain: production-1
+        kubevirt.io/os: linux
+        production: ready
+    spec:
+      domain:
+        cpu:
+          cores: 8
+        devices:
+          disks:
+          - disk:
+              bus: virtio
+            name: production-1-disk0
+          - cdrom:
+              bus: sata
+            name: cloudinitdisk
+          interfaces:
+          - bridge: {}
+            name: default
+        machine:
+          type: q35
+        resources:
+          limits:
+            memory: 8192M
+          requests:
+            memory: 8192M
+      networks:
+      - name: default
+        pod: {}
+      volumes:
+      - containerDisk:
+          image: quay.io/containerdisks/fedora:35
+        name: production-1-disk0
+      - cloudInitNoCloud:
+          networkData: |
+            ethernets:
+              eth0:
+                dhcp4: true
+            version: 2
+          userData: |-
+            #cloud-config
+            final_message: kcli boot finished, up $UPTIME seconds
+            hostname: production-1
+            ssh_pwauth: True
+            disable_root: false
+            ssh_authorized_keys:
+            - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDkn/lJ9kGBAgiqOfMumICTCj/HHok+z1xFx8Eog/+RQiQt9ncVOQLQvub9BLtvmEfCibcN4VDs4rL/MVe1EwonL1fj2BCRVs7uUH81NrajcBs25L/dRVGBrWKcRDRPiCiCl8YDRfT38R6x5qtZOARS9Se+pwmBtTaEbRhRN6H7iU9xhfXqiDdz6TM0YaJz9zl9Bvk9IMUNJoFwbLHDTracU5I2EQsx5q+iXyFkRXYbwCYFcaqJWWJMadgo4IRksig0Jl4bM8/ERTxdNvUpjPnRJICJF8rwPJQIW4sHJSNzUyrkByH/DUeHsO35DN0cAUC73e1lP1dbLiz7VYYIV+/F kboumedh@vegeta.local
+            runcmd:
+            - yum -y install httpd; systemctl enable --now httpd; echo Put an SNO in your life $HOSTNAME > /var/www/html/index.html
+            ssh_pwauth: True
+        name: cloudinitdisk

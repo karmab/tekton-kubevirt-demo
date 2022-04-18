@@ -1,0 +1,155 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+ name: deploy-app
+spec:
+ results:
+ - name: url
+   description: url
+ params:
+ - name: message
+   description: message
+   type: string
+   default: 'SNO with VMS rules!'
+ steps:
+  - name: deploy-app
+    image: quay.io/karmab/kcli:latest
+    env:
+    - name: MESSAGE
+      value: $(params.message)
+    - name: NAMESPACE
+      value: $(context.taskRun.namespace)
+    script: |
+     #!/usr/bin/env bash
+     kcli download oc
+     chmod u+x oc
+     export PATH=.:$PATH
+     oc create -n $NAMESPACE -f https://raw.githubusercontent.com/karmab/tekton-kubevirt-demo/main/yaml/app.yml --dry-run=client -o yaml | sed "s/MESSAGE/$MESSAGE/" | oc apply -n $NAMESPACE -f -
+     oc get -n $NAMESPACE route production-web -o jsonpath={'.spec.host'} > $(results.url.path)
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+ name: deploy-vms
+spec:
+ params:
+ - name: message
+   description: message
+   type: string
+   default: 'SNO with VMS rules!'
+ - name: cluster
+   description: cluster
+   type: string
+   default: 'production'
+ - name: image
+   description: image
+   type: string
+   default: 'quay.io/containerdisks/fedora:35'
+ - name: vms_number
+   description: version
+   type: string
+   default: '2'
+ - name: ssh_pub_key
+   description: ssh_pub_key
+   type: string
+ - name: numcpus
+   description: numcpus
+   type: string
+   default: '8'
+ - name: memory
+   description: memory
+   type: string
+   default: '8192'
+ steps:
+   - name: deploy-vms
+     image: "quay.io/karmab/kcli:latest"
+     env:
+     - name: NAMESPACE
+       value: $(context.taskRun.namespace)
+     - name: MESSAGE
+       value: $(params.message)
+     - name: CLUSTER
+       value: $(params.cluster)
+     - name: IMAGE
+       value: $(params.image)
+     - name: VMS_NUMBER
+       value: $(params.vms_number)
+     - name: SSH_PUB_KEY
+       value: $(params.ssh_pub_key)
+     - name: NUMCPUS
+       value: $(params.numcpus)
+     - name: MEMORY
+       value: $(params.memory)
+     - name: PYTHONUNBUFFERED
+       value: "true"
+     script: |
+      #!/usr/bin/env bash
+      echo $HOME
+      mkdir $HOME/.kcli
+      ls $HOME/.kcli
+      echo $SSH_PUB_KEY > $HOME/.kcli/id_rsa.pub
+      touch $HOME/.kcli/id_rsa
+      chmod 600 $HOME/.kcli/id_rsa.pub
+      echo kcli -n $NAMESPACE create vm -i $IMAGE -P numcpus=$NUMCPUS -P memory=$MEMORY -P tags=['production=ready']-P cmds=["yum -y install httpd; systemctl enable --now httpd; echo $MESSAGE \$HOSTNAME > /var/www/html/index.html"] -P embed_userdata=true $CLUSTER --count=$VMS_NUMBER
+      kcli -n $NAMESPACE create vm -i $IMAGE -P numcpus=$NUMCPUS -P memory=$MEMORY -P tags=['production=ready'] -P cmds=["yum -y install httpd; systemctl enable --now httpd; echo $MESSAGE \$HOSTNAME > /var/www/html/index.html"] -P embed_userdata=true $CLUSTER --count=$VMS_NUMBER
+---
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: deploy-demo
+spec:
+  description: deploy demo
+  results:
+  - name: url
+    description: url
+    value: $(tasks.deploy-app.results.url)
+  params:
+  - name: message
+    description: message
+    type: string
+    default: 'SNO with VMS rules!'
+  - name: cluster
+    type: string
+    default: 'production'
+  - name: image
+    description: image
+    type: string
+    default: 'quay.io/containerdisks/fedora:35'
+  - name: vms_number
+    description: vms_number
+    type: string
+    default: '2'
+  - name: ssh_pub_key
+    type: string
+    default: 'ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDkn/lJ9kGBAgiqOfMumICTCj/HHok+z1xFx8Eog/+RQiQt9ncVOQLQvub9BLtvmEfCibcN4VDs4rL/MVe1EwonL1fj2BCRVs7uUH81NrajcBs25L/dRVGBrWKcRDRPiCiCl8YDRfT38R6x5qtZOARS9Se+pwmBtTaEbRhRN6H7iU9xhfXqiDdz6TM0YaJz9zl9Bvk9IMUNJoFwbLHDTracU5I2EQsx5q+iXyFkRXYbwCYFcaqJWWJMadgo4IRksig0Jl4bM8/ERTxdNvUpjPnRJICJF8rwPJQIW4sHJSNzUyrkByH/DUeHsO35DN0cAUC73e1lP1dbLiz7VYYIV+/F kboumedh@vegeta.local'
+  - name: numcpus
+    description: numcpus
+    type: string
+    default: '8'
+  - name: memory
+    description: memory
+    type: string
+    default: '8192'
+  tasks:
+  - name: deploy-app
+    taskRef:
+      name: deploy-app
+    params:
+    - name: message
+      value: $(params.message)
+  - name: deploy-vms
+    taskRef:
+      name: deploy-vms
+    params:
+    - name: message
+      value: $(params.message)
+    - name: cluster
+      value: $(params.cluster)
+    - name: vms_number
+      value: $(params.vms_number)
+    - name: ssh_pub_key
+      value: $(params.ssh_pub_key)
+    - name: numcpus
+      value: $(params.numcpus)
+    - name: memory
+      value: $(params.memory)

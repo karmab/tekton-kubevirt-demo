@@ -1,0 +1,24 @@
+apiVersion: tekton.dev/v1beta1
+kind: PipelineRun
+metadata:
+  generateName: deploy-demo
+spec:
+  pipelineRef:
+    name: deploy-demo
+  params:
+    - name: message
+      value: 'Put an SNO in your life'
+    - name: cluster
+      value: 'production'
+    - name: image
+      value: 'quay.io/containerdisks/fedora:35'
+    - name: vms_number
+      value: '2'
+    - name: ssh_pub_key
+      value: 'ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDkn/lJ9kGBAgiqOfMumICTCj/HHok+z1xFx8Eog/+RQiQt9ncVOQLQvub9BLtvmEfCibcN4VDs4rL/MVe1EwonL1fj2BCRVs7uUH81NrajcBs25L/dRVGBrWKcRDRPiCiCl8YDRfT38R6x5qtZOARS9Se+pwmBtTaEbRhRN6H7iU9xhfXqiDdz6TM0YaJz9zl9Bvk9IMUNJoFwbLHDTracU5I2EQsx5q+iXyFkRXYbwCYFcaqJWWJMadgo4IRksig0Jl4bM8/ERTxdNvUpjPnRJICJF8rwPJQIW4sHJSNzUyrkByH/DUeHsO35DN0cAUC73e1lP1dbLiz7VYYIV+/F kboumedh@vegeta.local'
+    - name: numcpus
+      value: '8'
+    - name: memory
+      value: '8192'
+    - name: disk_size
+      value: '30'
